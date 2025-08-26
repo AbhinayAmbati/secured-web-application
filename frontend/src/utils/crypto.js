@@ -69,47 +69,96 @@ const storePrivateKey = async (keyId, privateKey) => {
   });
 };
 
+// Security alert dispatcher
+const dispatchSecurityAlert = (type, details = {}) => {
+  window.dispatchEvent(new CustomEvent('security-alert', {
+    detail: { type, details, timestamp: Date.now() }
+  }));
+};
+
+// Test function to manually trigger security alerts (for development/testing)
+export const testSecurityAlert = (type = 'indexeddb_tampering') => {
+  console.log(`🧪 Testing security alert: ${type}`);
+  dispatchSecurityAlert(type, { test: true, keyId: 'test-key-id' });
+};
+
 // Retrieve private key from IndexedDB
 export const getPrivateKey = async (keyId) => {
   return new Promise((resolve, reject) => {
     const request = indexedDB.open('DeviceKeys', 1);
-    
-    request.onerror = () => reject(request.error);
-    
+
+    request.onerror = () => {
+      console.error('IndexedDB access failed - potential tampering detected');
+      dispatchSecurityAlert('indexeddb_access_failed', { keyId });
+      reject(request.error);
+    };
+
     request.onsuccess = async (event) => {
       const db = event.target.result;
-      
-      const transaction = db.transaction(['keys'], 'readonly');
-      const store = transaction.objectStore('keys');
-      const getRequest = store.get(keyId);
-      
-      getRequest.onsuccess = async () => {
-        const result = getRequest.result;
-        if (!result) {
-          reject(new Error('Private key not found'));
+
+      try {
+        // Check if the object store exists
+        if (!db.objectStoreNames.contains('keys')) {
+          console.error('Object store missing - database tampering detected');
+          dispatchSecurityAlert('indexeddb_tampering', {
+            keyId,
+            availableStores: Array.from(db.objectStoreNames)
+          });
+          reject(new Error('Database structure compromised'));
           return;
         }
-        
-        try {
-          // Import private key from stored data
-          const privateKey = await crypto.subtle.importKey(
-            'jwk',
-            result.keyData,
-            {
-              name: 'ECDSA',
-              namedCurve: 'P-256'
-            },
-            false,
-            ['sign']
-          );
-          
-          resolve(privateKey);
-        } catch (error) {
-          reject(error);
-        }
-      };
+
+        const transaction = db.transaction(['keys'], 'readonly');
+        const store = transaction.objectStore('keys');
+        const getRequest = store.get(keyId);
+
+        transaction.onerror = () => {
+          console.error('Transaction failed - potential database corruption');
+          dispatchSecurityAlert('transaction_failed', { keyId });
+          reject(new Error('Database transaction failed'));
+        };
       
-      getRequest.onerror = () => reject(getRequest.error);
+        getRequest.onsuccess = async () => {
+          const result = getRequest.result;
+          if (!result) {
+            console.warn('Private key not found - potential key theft attempt');
+            dispatchSecurityAlert('private_key_missing', { keyId });
+            reject(new Error('Private key not found'));
+            return;
+          }
+
+          try {
+            // Import private key from stored data
+            const privateKey = await crypto.subtle.importKey(
+              'jwk',
+              result.keyData,
+              {
+                name: 'ECDSA',
+                namedCurve: 'P-256'
+              },
+              false,
+              ['sign']
+            );
+
+            resolve(privateKey);
+          } catch (error) {
+            console.error('Private key import failed:', error);
+            dispatchSecurityAlert('key_import_failed', { keyId, error: error.message });
+            reject(error);
+          }
+        };
+
+        getRequest.onerror = () => {
+          console.error('Private key retrieval failed');
+          dispatchSecurityAlert('key_retrieval_failed', { keyId });
+          reject(new Error('Failed to retrieve private key'));
+        };
+
+      } catch (error) {
+        console.error('IndexedDB operation failed:', error);
+        dispatchSecurityAlert('indexeddb_operation_failed', { keyId, error: error.message });
+        reject(new Error('Database operation failed'));
+      }
     };
   });
 };
@@ -208,18 +257,47 @@ export const cleanupOldKeys = async (maxAge = 30 * 24 * 60 * 60 * 1000) => {
 export const deleteDeviceKey = async (keyId) => {
   return new Promise((resolve, reject) => {
     const request = indexedDB.open('DeviceKeys', 1);
-    
-    request.onerror = () => reject(request.error);
-    
+
+    request.onerror = () => {
+      console.error('IndexedDB access failed during key deletion');
+      dispatchSecurityAlert('indexeddb_delete_failed', { keyId });
+      reject(request.error);
+    };
+
     request.onsuccess = (event) => {
-      const db = event.target.result;
-      const transaction = db.transaction(['keys'], 'readwrite');
-      const store = transaction.objectStore('keys');
-      
-      const deleteRequest = store.delete(keyId);
-      
-      deleteRequest.onsuccess = () => resolve();
-      deleteRequest.onerror = () => reject(deleteRequest.error);
+      try {
+        const db = event.target.result;
+
+        if (!db.objectStoreNames.contains('keys')) {
+          console.error('Object store missing during key deletion');
+          dispatchSecurityAlert('store_missing_on_delete', { keyId });
+          reject(new Error('Database structure compromised'));
+          return;
+        }
+
+        const transaction = db.transaction(['keys'], 'readwrite');
+        const store = transaction.objectStore('keys');
+
+        const deleteRequest = store.delete(keyId);
+
+        deleteRequest.onsuccess = () => resolve();
+        deleteRequest.onerror = () => {
+          console.error('Key deletion failed');
+          dispatchSecurityAlert('key_delete_failed', { keyId });
+          reject(deleteRequest.error);
+        };
+
+        transaction.onerror = () => {
+          console.error('Delete transaction failed');
+          dispatchSecurityAlert('delete_transaction_failed', { keyId });
+          reject(new Error('Delete transaction failed'));
+        };
+
+      } catch (error) {
+        console.error('Key deletion operation failed:', error);
+        dispatchSecurityAlert('key_deletion_operation_failed', { keyId, error: error.message });
+        reject(error);
+      }
     };
   });
 };

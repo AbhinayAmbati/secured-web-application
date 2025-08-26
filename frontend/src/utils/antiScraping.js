@@ -5,20 +5,33 @@ class AntiScrapingProtection {
   constructor() {
     this.isBot = false;
     this.challenges = [];
-    this.protectionLevel = 'high';
+    this.protectionLevel = 'low'; // Changed to low for better UX
+    this.isDevelopment = import.meta.env.DEV || window.location.hostname === 'localhost';
+
+    if (this.isDevelopment) {
+      console.log('🛡️ Anti-scraping protection running in development mode (reduced sensitivity)');
+    }
+
     this.init();
   }
 
   init() {
+    // Check if anti-scraping is disabled
+    if (localStorage.getItem('disable-anti-scraping') === 'true') {
+      console.log('🛡️ Anti-scraping protection disabled by user preference');
+      return;
+    }
+
     this.detectBots();
-    this.obfuscateContent();
-    this.addMouseTracker();
-    this.addKeyboardTracker();
-    this.addScrollTracker();
+    // Temporarily disable aggressive features for better user experience
+    // this.obfuscateContent();
+    // this.addMouseTracker();
+    // this.addKeyboardTracker();
+    // this.addScrollTracker();
     this.addTimingAnalysis();
     this.addCanvasFingerprinting();
-    this.addDynamicChallenges();
-    this.protectDevTools();
+    // this.addDynamicChallenges();
+    // this.protectDevTools();
   }
 
   // 1. Advanced Bot Detection
@@ -56,14 +69,19 @@ class AntiScrapingProtection {
       try {
         return score + (check() ? 1 : 0);
       } catch {
-        return score + 1; // Errors often indicate automation
+        return score + 0.5; // Reduce penalty for errors
       }
     }, 0);
 
-    this.isBot = botScore > 3;
-    
-    if (this.isBot) {
+    // Much higher threshold to avoid false positives
+    // In development, be even more lenient
+    const threshold = this.isDevelopment ? 15 : 8;
+    this.isBot = botScore > threshold;
+
+    if (this.isBot && !this.isDevelopment) {
       this.triggerBotProtection();
+    } else if (this.isBot && this.isDevelopment) {
+      console.warn('🤖 Bot-like behavior detected but ignored in development mode');
     }
   }
 
@@ -111,12 +129,12 @@ class AntiScrapingProtection {
       lastMouseTime = currentTime;
     });
 
-    // Check for mouse movements after 5 seconds
+    // Check for mouse movements after 10 seconds (more lenient)
     setTimeout(() => {
-      if (mouseMovements < 5) {
+      if (mouseMovements < 2) {
         this.addSuspiciousActivity('no_mouse_movement');
       }
-    }, 5000);
+    }, 10000);
   }
 
   addKeyboardTracker() {
@@ -171,10 +189,10 @@ class AntiScrapingProtection {
   addTimingAnalysis() {
     const startTime = performance.now();
     
-    // Check page load speed (bots often load faster)
+    // Check page load speed (bots often load faster) - more lenient
     window.addEventListener('load', () => {
       const loadTime = performance.now() - startTime;
-      if (loadTime < 100) {
+      if (loadTime < 50) { // Very fast loads only
         this.addSuspiciousActivity('too_fast_load');
       }
     });
@@ -267,8 +285,8 @@ class AntiScrapingProtection {
       });
     };
 
-    // Trigger challenges based on suspicion level
-    if (this.challenges.length > 2) {
+    // Trigger challenges based on suspicion level - much higher threshold
+    if (this.challenges.length > 10) {
       visualChallenge().then(passed => {
         if (!passed) {
           this.triggerBotProtection();
@@ -342,8 +360,8 @@ class AntiScrapingProtection {
       userAgent: navigator.userAgent
     });
 
-    // Send to backend for logging
-    if (this.challenges.length > 5) {
+    // Send to backend for logging - much higher threshold
+    if (this.challenges.length > 15) {
       this.triggerBotProtection();
     }
   }
@@ -362,7 +380,8 @@ class AntiScrapingProtection {
     `;
 
     // Send bot detection report to backend
-    fetch('/api/security/bot-detected', {
+    const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001/api';
+    fetch(`${API_BASE_URL}/security/bot-detected`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -373,9 +392,13 @@ class AntiScrapingProtection {
     }).catch(() => {}); // Ignore errors
   }
 
-  // Public method to check if user is verified
+  // Public method to check if user is verified - much more lenient
   isVerifiedHuman() {
-    return !this.isBot && this.challenges.length < 3;
+    // Always return true in development mode
+    if (this.isDevelopment) {
+      return true;
+    }
+    return !this.isBot && this.challenges.length < 10;
   }
 }
 

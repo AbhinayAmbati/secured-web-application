@@ -78,24 +78,73 @@ export const AuthProvider = ({ children }) => {
   }, []);
 
   // Security alert for unauthorized access attempts
-  const showSecurityAlert = () => {
+  const showSecurityAlert = (alertType = 'general', details = {}) => {
+    // Get alert-specific messages
+    const getAlertInfo = (type) => {
+      const alerts = {
+        'token-theft-attempt': {
+          title: 'Token Theft Attempt Detected',
+          description: 'Invalid session credentials detected',
+          technical: 'DPoP authentication validation failed'
+        },
+        'indexeddb_tampering': {
+          title: 'Database Tampering Detected',
+          description: 'Security database has been modified',
+          technical: 'IndexedDB object store structure compromised'
+        },
+        'indexeddb_access_failed': {
+          title: 'Database Access Blocked',
+          description: 'Security database cannot be accessed',
+          technical: 'IndexedDB access denied or corrupted'
+        },
+        'private_key_missing': {
+          title: 'Security Key Missing',
+          description: 'Device security key has been removed',
+          technical: 'Private key not found in secure storage'
+        },
+        'transaction_failed': {
+          title: 'Database Transaction Failed',
+          description: 'Security database operation blocked',
+          technical: 'IndexedDB transaction error detected'
+        },
+        'indexeddb_store_failed': {
+          title: 'Security Key Storage Failed',
+          description: 'Unable to store security credentials',
+          technical: 'IndexedDB write operation blocked'
+        },
+        'key_delete_failed': {
+          title: 'Key Deletion Blocked',
+          description: 'Security key removal was prevented',
+          technical: 'IndexedDB delete operation failed'
+        },
+        'general': {
+          title: 'Security Alert',
+          description: 'Unauthorized access attempt detected',
+          technical: 'Multiple security violations detected'
+        }
+      };
+      return alerts[type] || alerts['general'];
+    };
+
+    const alertInfo = getAlertInfo(alertType);
+
     // Professional console message for security logs
     console.warn(`
-    SECURITY ALERT - Unauthorized Access Attempt Detected
+    SECURITY ALERT - ${alertInfo.title}
 
     Timestamp: ${new Date().toISOString()}
-    Event: Invalid session credentials detected
+    Event: ${alertInfo.description}
     Action: Access denied, session terminated
 
     Technical Details:
-    • DPoP authentication validation failed
-    • Device-bound private key not found
-    • Session tokens do not match registered device
+    • ${alertInfo.technical}
+    • Session tokens invalidated
+    • User redirected to authentication
 
     Security Measures Activated:
     • Invalid session data cleared
-    • User redirected to authentication
-    • Incident logged for security review
+    • Security incident logged
+    • Enhanced monitoring activated
     `);
 
     // Create a professional security alert dialog
@@ -145,26 +194,27 @@ export const AuthProvider = ({ children }) => {
             </div>
             <div>
               <h2 style="margin: 0; font-size: 1.25rem; font-weight: 600; color: #111827;">
-                Security Alert
+                ${alertInfo.title}
               </h2>
               <p style="margin: 0; font-size: 0.875rem; color: #6b7280;">
-                Unauthorized access attempt detected
+                ${alertInfo.description}
               </p>
             </div>
           </div>
 
           <div style="margin-bottom: 1.5rem;">
             <p style="margin: 0 0 1rem 0; font-size: 0.95rem; color: #374151; line-height: 1.5;">
-              Your session credentials are invalid or have been tampered with. This incident has been logged for security purposes.
+              ${alertInfo.description}. This security incident has been logged and appropriate measures have been taken.
             </p>
             <div style="background: #f9fafb; padding: 1rem; border-radius: 8px; border-left: 4px solid #dc2626;">
               <p style="margin: 0; font-size: 0.875rem; color: #4b5563; font-weight: 500;">
                 <strong>Security Measures Activated:</strong>
               </p>
               <ul style="margin: 0.5rem 0 0 0; padding-left: 1.25rem; font-size: 0.875rem; color: #6b7280;">
-                <li>Device authentication validation failed</li>
+                <li>${alertInfo.technical}</li>
                 <li>Session terminated and cleared</li>
-                <li>Access attempt logged and monitored</li>
+                <li>Enhanced security monitoring activated</li>
+                <li>Access attempt logged for review</li>
               </ul>
             </div>
           </div>
@@ -258,8 +308,25 @@ export const AuthProvider = ({ children }) => {
     };
 
     const handleSecurityAlert = (event) => {
-      if (event.detail?.type === 'token-theft-attempt') {
-        showSecurityAlert();
+      const alertType = event.detail?.type;
+
+      // Handle different types of security alerts
+      const securityAlertTypes = [
+        'token-theft-attempt',
+        'indexeddb_tampering',
+        'indexeddb_access_failed',
+        'private_key_missing',
+        'transaction_failed',
+        'indexeddb_operation_failed',
+        'indexeddb_store_failed',
+        'key_delete_failed',
+        'store_missing_on_delete',
+        'delete_transaction_failed',
+        'key_deletion_operation_failed'
+      ];
+
+      if (securityAlertTypes.includes(alertType)) {
+        showSecurityAlert(alertType, event.detail);
       }
     };
 
