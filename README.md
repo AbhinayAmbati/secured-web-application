@@ -636,7 +636,8 @@ This project is licensed under the **MIT License** - see the [LICENSE](LICENSE) 
 
 ---
 
-**Built with ❤️ and 🛡️ by the PreventScrapping Team**
+**Built with ❤️ and 🛡️ by the Abhinay Ambati**
 
 *Protecting your web applications from automated threats while maintaining excellent user experience.*
+
 
