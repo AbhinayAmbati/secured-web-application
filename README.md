@@ -631,13 +631,11 @@ This project is licensed under the **MIT License** - see the [LICENSE](LICENSE) 
 
 - **Documentation**: Check this README and inline code comments
 - **Issues**: Report bugs via GitHub Issues
-- **Security**: Report security issues privately to security@example.com
-- **Community**: Join our Discord server for discussions
-
 ---
 
 **Built with ❤️ and 🛡️ by the Abhinay Ambati**
 
 *Protecting your web applications from automated threats while maintaining excellent user experience.*
+
 
 
